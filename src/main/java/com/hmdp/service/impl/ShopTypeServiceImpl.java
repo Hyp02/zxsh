@@ -30,6 +30,10 @@ public class ShopTypeServiceImpl extends ServiceImpl<ShopTypeMapper, ShopType> i
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    /**
+     * 查询店铺列表，使用Redis进行缓存
+     * @return
+     */
     @Override
     public Result queryShopList() {
         // 查询redis
