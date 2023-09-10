@@ -31,7 +31,7 @@ public class RefreshInterceptor implements HandlerInterceptor {
         // 获取session中的信息
         //UserDTO userMap =(UserDTO) request.getSession().getAttribute("user");
         // 是否存在
-        // 获取token
+        // 获取前端请求的token
         String token = request.getHeader("authorization");
         if (StringUtils.isBlank(token)) {
             return true;
