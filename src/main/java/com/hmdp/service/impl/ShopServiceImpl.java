@@ -33,7 +33,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
     /**
      * 查询店铺信息并使用redis缓存
-     *
+     * 解决缓存穿透
      * @param id
      * @return
      */
@@ -47,11 +47,19 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             Shop shop = JSONUtil.toBean(shopJson, Shop.class);
             return Result.ok(shop);
         }
+        // 如果是写入的空缓存
+        if ("".equals(shopJson)){
+            // 结束
+            return Result.fail("店铺找不到了");
+        }
         // 未命中 在数据库中查
         // 数据库中不存在 返回错误信息【getById是接口中的方法】
         Shop shop = getById(id);
         if (shop == null) {
-            return Result.fail("对不起，该店铺已消失");
+            // 缓存穿透解决 写入空值
+            stringRedisTemplate.opsForValue().set(RedisConstants.CACHE_SHOP_KEY + id, "",
+                    RedisConstants.CACHE_NULL_TTL, TimeUnit.MINUTES);
+            return Result.fail("店铺找不到了");
         }
         String toJsonShop = JSONUtil.toJsonStr(shop);
         // 数据库中存在 先保存在redis中再返回
@@ -77,7 +85,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         }
         // 修改数据库
         boolean b = updateById(shop);
-        if (!b){
+        if (!b) {
             return Result.fail("更新店铺信息失败");
         }
         // 删除缓存
