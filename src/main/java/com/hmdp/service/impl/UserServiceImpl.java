@@ -115,7 +115,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         String token = UUID.randomUUID().toString(true);
         String userToken = LOGIN_USER_KEY + token;
         stringRedisTemplate.opsForHash().putAll(userToken, userMap);
-        // 设置有效期
         /**
          * 这里设置的是无论用户怎么操作，一到30分钟就会过期
          * 但是我们需要的是当用户没有任何操作时，超过30分钟，才过期
@@ -123,6 +122,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
          * 但是我们怎么知道用户到底在不在操作呢？
          *      答：当用户操作时就会触发拦截器，所以判断用户是否操作就是判断拦截器是否触发
          */
+        // 设置有效期
         stringRedisTemplate.expire(RedisConstants.LOGIN_USER_KEY + token, LOGIN_USER_TTL, TimeUnit.MINUTES);
         // 返回token
         return Result.ok(token);
