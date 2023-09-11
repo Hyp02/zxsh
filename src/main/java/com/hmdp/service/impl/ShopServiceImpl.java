@@ -182,7 +182,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
                     throw new RuntimeException(e);
                 } finally {
                     // 释放锁
-                    delLock(RedisConstants.LOCK_SHOP_KEY);
+                    delLock(RedisConstants.LOCK_SHOP_KEY+id);
                 }
             });
         }
@@ -259,7 +259,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
      */
     public void addExpiredTimeByShop(Long id, Long expiredSecond) {
         Shop shop = getById(id);
-        RedisDate<Shop> hotShop = new RedisDate();
+        RedisDate hotShop = new RedisDate();
         hotShop.setExpiredTime(LocalDateTime.now().plusSeconds(expiredSecond));
         hotShop.setData(shop);
         //写入Redis
