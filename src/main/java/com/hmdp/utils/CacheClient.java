@@ -30,10 +30,24 @@ public class CacheClient {
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    /**
+     * redis String类型存储数据
+     * @param key 数据存储的key
+     * @param value 要存放的对象
+     * @param time 过期时间
+     * @param unit 过期时间单位
+     */
     public void setValue(String key, Object value, Long time, TimeUnit unit) {
         stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(value), time, unit);
     }
 
+    /**
+     * 设置逻辑过期
+     * @param key 数据存放的key
+     * @param value 要设置的对象
+     * @param time 逻辑过期时间
+     * @param unit 逻辑过期时间单位
+     */
     public void setWithLogicExpired(String key, Object value, Long time, TimeUnit unit) {
         RedisDate redisDate = new RedisDate();
         redisDate.setExpiredTime(LocalDateTime.now().plusSeconds(unit.toSeconds(time)));
@@ -41,6 +55,18 @@ public class CacheClient {
         stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(redisDate));
     }
 
+    /**
+     * 使用写入空缓存解决缓存穿透
+     * @param KeyPrefix 要解决缓存穿透对应数据的缓存key
+     * @param id 店铺 id
+     * @param tClass 返回对象类型
+     * @param time 缓存过期时间
+     * @param unit 缓存过期时间单位
+     * @param dbMethod 函数 查询数据库方法
+     * @param <T> 返回值类型
+     * @param <ID> id类型
+     * @return
+     */
     public <T, ID> T queryWithPassThorough(String KeyPrefix, ID id, Class<T> tClass,
                                            Long time, TimeUnit unit, Function<ID, T> dbMethod) {
         // 查询redis【这里的数据类型可选择Hash和String(这次选择String)】
@@ -75,12 +101,18 @@ public class CacheClient {
 
     /**
      * 逻辑过期解决缓存击穿
-     *
-     * @param id
+     * @param keyPrefix 要解决缓存击穿问题的缓存的key前缀
+     * @param id 数据id
+     * @param tClass 返回类型
+     * @param dbMethod 查询数据库方法
+     * @param time 逻辑过期时间
+     * @param unit 逻辑过期时间单位
+     * @param <T> 返回类型
+     * @param <ID> id类型
      * @return
      */
-    public <T, ID> T queryWithExpiredTime(String keyPrefix, ID id, Class<T> tClass,
-                                          Function<ID, T> dbMethod, Long time, TimeUnit unit) {
+    public <T, ID> T queryWithLogicExpiredTime(String keyPrefix, ID id, Class<T> tClass,
+                                               Function<ID, T> dbMethod, Long time, TimeUnit unit) {
         String key = keyPrefix + id;
         // 查询redis【这里的数据类型可选择Hash和String(这次选择String)】
         String json = stringRedisTemplate.opsForValue().get(key);
@@ -127,11 +159,14 @@ public class CacheClient {
     }
 
     /**
-     * 解决缓存穿透查询店铺函数
      * 互斥锁解决缓存击穿
-     *
-     * @param id 传入商铺id,用来获取Redis的key
-     * @return
+     * @param keyPrefix 要解决缓存击穿的缓存的key
+     * @param id 数据id
+     * @param tClass 返回对象类型
+     * @param dbMethod 查询数据库方法
+     * @param <T> 返回类型
+     * @param <ID> id类型
+     * @return 返回指定类型对象
      */
     private <T,ID> T queryWithMutex(String keyPrefix,ID id,Class<T> tClass,Function<ID,T> dbMethod) {
         String key = keyPrefix+id;
