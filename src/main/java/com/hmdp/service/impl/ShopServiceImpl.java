@@ -12,6 +12,7 @@ import com.hmdp.entity.Shop;
 import com.hmdp.mapper.ShopMapper;
 import com.hmdp.service.IShopService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmdp.utils.HotShop;
 import com.hmdp.utils.RedisConstants;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.util.Arrays;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -50,15 +52,24 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
      */
     @Override
     public Result queryById(Long id) {
-        // 空缓存解决缓存穿透
-        //Shop shop = this.queryWithPassThorough(id);
         // 互斥锁解决缓存击穿
         //Shop shop = this.queryWithMutex(id);
-        Shop shop = this.queryWithExpiredTime(id);
+        // 判断店铺是否是热点店铺
+        Shop shop = null;
+        if (Arrays.asList(HotShop.hotShopId).contains(id)) {
+            // 指定逻辑过期解决高并发问题的缓存击穿
+            shop = this.queryWithExpiredTime(id);
+            if (shop == null){
+                Result.fail("店铺不见了");
+            }
+            return Result.ok(shop);
+        }
+        // 如果不是热点店铺，并发不高
+        // 空缓存解决缓存穿透
+        shop = this.queryWithPassThorough(id);
         if (shop == null) {
             Result.fail("店铺不见了");
         }
-        // 逻辑过期解决缓存击穿
         return Result.ok(shop);
     }
 
@@ -177,12 +188,11 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             CACHE_REBUILD_EXECUTOR.submit(() -> {
                 try {
                     this.addExpiredTimeByShop(id, 20L);
-
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 } finally {
                     // 释放锁
-                    delLock(RedisConstants.LOCK_SHOP_KEY+id);
+                    delLock(RedisConstants.LOCK_SHOP_KEY + id);
                 }
             });
         }
