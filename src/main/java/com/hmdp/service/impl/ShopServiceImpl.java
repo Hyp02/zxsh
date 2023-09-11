@@ -14,8 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.Arrays;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -50,7 +48,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         Shop shop = null;
         if (Arrays.asList(HotShop.hotShopId).contains(id)) {
             // 指定逻辑过期解决高并发问题的缓存击穿
-            shop = cacheClient.queryWithExpiredTime(RedisConstants.CACHE_SHOP_KEY,id, Shop.class,id2->getById(id2),
+            shop = cacheClient.queryWithLogicExpiredTime(RedisConstants.CACHE_SHOP_KEY,id, Shop.class, id2->getById(id2),
                     20L,TimeUnit.SECONDS);
             if (shop == null){
                 Result.fail("店铺不见了");
