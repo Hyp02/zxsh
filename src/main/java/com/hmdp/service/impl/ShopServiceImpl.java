@@ -48,7 +48,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         Shop shop = null;
         if (Arrays.asList(HotShop.hotShopId).contains(id)) {
             // 指定逻辑过期解决高并发问题的缓存击穿
-            shop = cacheClient.queryWithLogicExpiredTime(RedisConstants.CACHE_SHOP_KEY,id, Shop.class, id2->getById(id2),
+            shop = cacheClient.queryWithLogicExpiredTime(RedisConstants.CACHE_SHOP_KEY,id, Shop.class, this::getById,
                     20L,TimeUnit.SECONDS);
             if (shop == null){
                 Result.fail("店铺不见了");
@@ -59,7 +59,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         // 空缓存解决缓存穿透
         //shop = this.queryWithPassThorough(id);
         shop = cacheClient.queryWithPassThorough(RedisConstants.CACHE_SHOP_KEY, id, Shop.class,
-                RedisConstants.CACHE_SHOP_TTL, TimeUnit.MINUTES, id2 -> getById(id2));
+                RedisConstants.CACHE_SHOP_TTL, TimeUnit.MINUTES, this::getById);
         if (shop == null) {
             Result.fail("店铺不见了");
         }
