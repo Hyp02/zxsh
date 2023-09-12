@@ -1,5 +1,4 @@
 [redis.md](https://github.com/Hyp02/hm-dianping/files/12577092/redis.md)# hm-dianping
-> 注意，以黑马点评来做教程
 >
 > 部署上线时运行路径是`/www/wwwroot/nginx-1.18.0/html/hmdp;`
 >
