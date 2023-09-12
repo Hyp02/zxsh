@@ -61,7 +61,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         shop = cacheClient.queryWithPassThorough(RedisConstants.CACHE_SHOP_KEY, id, Shop.class,
                 RedisConstants.CACHE_SHOP_TTL, TimeUnit.MINUTES, this::getById);
         if (shop == null) {
-            Result.fail("店铺不见了");
+            return Result.fail("店铺不见了");
         }
         return Result.ok(shop);
     }
