@@ -24,7 +24,7 @@ public class RedisIdWorker {
     private StringRedisTemplate stringRedisTemplate;
     /**
      * 获取订单id
-     * @param keyPrefix
+     * @param keyPrefix key前缀
      * @return
      */
     public long nextId(String keyPrefix) {
