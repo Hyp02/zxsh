@@ -22,13 +22,6 @@ public class RedisIdWorker {
     // 注入
     @Resource
     private StringRedisTemplate stringRedisTemplate;
-
-    public static void main(String[] args) {
-        LocalDateTime time = LocalDateTime.of(2023, 1, 1, 0, 0, 0);
-        long l = time.toEpochSecond(ZoneOffset.UTC);
-        System.out.println(l);
-    }
-
     /**
      * 获取订单id
      * @param keyPrefix
