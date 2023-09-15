@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 
 /**
  * <p>
- *  服务实现类
+ * 服务实现类
  * </p>
  *
  * @author 虎哥
@@ -35,6 +35,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     /**
      * 优惠券下单
      * 使用乐观锁解决超卖
+     *
      * @param voucherId
      * @return
      */
@@ -44,7 +45,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         // 校验优惠券状态
         SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
         // 校验有效期
-        if (voucher.getBeginTime().isAfter(LocalDateTime.now())){
+        if (voucher.getBeginTime().isAfter(LocalDateTime.now())) {
             return Result.fail("活动未开始时间");
         }
         if (voucher.getEndTime().isBefore(LocalDateTime.now())) {
@@ -52,9 +53,10 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         }
         // 校验库存
         Integer voucherStock = voucher.getStock();
-        if (voucherStock<1){
+        if (voucherStock < 1) {
             return Result.fail("库存不足");
         }
+
         // 扣减库存
         boolean update = seckillVoucherService.update()
                 .setSql("stock=stock-1")
@@ -62,8 +64,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                 // where voucher_id = xx and stock = xx【乐观锁】
                 //.eq("stock", voucherStock)
                 // where voucher_id = xx and stock > 0 优化乐观锁，只要库存大于0就可以减鲁村】
-                .gt("stock",0).update();
-        if (!update){
+                .gt("stock", 0).update();
+        if (!update) {
             return Result.fail("库存不足");
         }
         // 生成订单id
