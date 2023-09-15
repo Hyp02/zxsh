@@ -34,6 +34,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     /**
      * 优惠券下单
+     * 使用乐观锁解决超卖
      * @param voucherId
      * @return
      */
@@ -57,7 +58,11 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         // 扣减库存
         boolean update = seckillVoucherService.update()
                 .setSql("stock=stock-1")
-                .eq("voucher_id", voucherId).update();
+                .eq("voucher_id", voucherId)
+                // where voucher_id = xx and stock = xx【乐观锁】
+                //.eq("stock", voucherStock)
+                // where voucher_id = xx and stock > 0 优化乐观锁，只要库存大于0就可以减鲁村】
+                .gt("stock",0).update();
         if (!update){
             return Result.fail("库存不足");
         }
