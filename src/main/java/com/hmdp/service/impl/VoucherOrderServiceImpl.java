@@ -11,8 +11,10 @@ import com.hmdp.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.service.IVoucherService;
 import com.hmdp.utils.RedisIdWorker;
+import com.hmdp.utils.SimpleRedisLock;
 import com.hmdp.utils.UserHolder;
 import org.springframework.aop.framework.AopContext;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,10 +36,14 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     private ISeckillVoucherService seckillVoucherService;
     @Resource
     private RedisIdWorker redisIdWorker;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     /**
      * 优惠券下单
      * 使用乐观锁解决超卖
+     * <p>
+     * 添加分布式锁
      *
      * @param voucherId
      * @return
@@ -59,15 +65,37 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("库存不足");
         }
         Long userId = UserHolder.getUser().getId();
-        // spring事务是交给ioc容器进行管理的，事务提交的时机不确定，因为释放锁需要在事务完成后，所以需要在整个方法上加锁
-        synchronized (userId.toString().intern()) {
-            // Spring 默认使用基于 AOP 的代理机制来实现事务管理，这意味着只有通过代理调用的方法才会触发事务切面
-            // 要获取代理对象来调用，防止事务失效
+
+        /*
+            这里获取锁是从redis中获取，redis服务只有一台，所以解决了用户在不同服务器上能重复购买的问题
+         */
+        SimpleRedisLock orderLock = new SimpleRedisLock(stringRedisTemplate, "order:" + userId);
+        boolean tryLock = orderLock.tryLock(7);
+        if (!tryLock) {
+            return Result.fail("不能重复下单");
+        }
+        try {
             IVoucherOrderService voucherOrderService = (IVoucherOrderService) AopContext.currentProxy();
             return voucherOrderService.createOrder(voucherId);
+        } finally {
+            orderLock.delLock();
         }
+        // spring事务是交给ioc容器进行管理的，事务提交的时机不确定，因为释放锁需要在事务完成后，所以需要在整个方法上加锁
+        //synchronized (userId.toString().intern()) {
+        //    // Spring 默认使用基于 AOP 的代理机制来实现事务管理，这意味着只有通过代理调用的方法才会触发事务切面
+        //    // 要获取代理对象来调用，防止事务失效
+        //    IVoucherOrderService voucherOrderService = (IVoucherOrderService) AopContext.currentProxy();
+        //    // 优惠券订单，使用代理对象调用，防止事务失效
+        //    return voucherOrderService.createOrder(voucherId);
+        //}
     }
 
+    /**
+     * 优惠券订单
+     *
+     * @param voucherId
+     * @return
+     */
     @Transactional
     public Result createOrder(Long voucherId) {
         // 一人一单
@@ -76,7 +104,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         // 使用intern返回字符串常量池中已经存在的对象的值，不会返回新对象
         synchronized (userId.toString().intern()) {
 
-            Integer count = query().eq("user_id", userId).eq("voucher_id", voucherId).count();
+            Integer count = query().eq("user_id", userId)
+                    .eq("voucher_id", voucherId)
+                    .count();
             if (count > 0) {
                 return Result.fail("您已经购买过了");
             }
@@ -86,7 +116,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                     .eq("voucher_id", voucherId)
                     // where voucher_id = xx and stock = xx【乐观锁】
                     //.eq("stock", voucherStock)
-                    // where voucher_id = xx and stock > 0 优化乐观锁，只要库存大于0就可以减鲁村】
+                    // where voucher_id = xx and stock > 0 优化乐观锁，只要库存大于0就可以减库存  然后再加锁限制同一用户购买】
                     .gt("stock", 0).update();
             if (!update) {
                 return Result.fail("库存不足");
