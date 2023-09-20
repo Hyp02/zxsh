@@ -18,7 +18,7 @@ if (redis.call("sismember", orderKey, userId) == 1) then
 end
 -- 扣减库存
 redis.call("incrby", stockKey, -1)
--- 保存下单用户
+-- 保存下单用户 set
 redis.call("sadd", orderKey, userId)
 -- 成功返回0
 return 0
