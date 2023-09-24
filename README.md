@@ -1,5 +1,3 @@
-[redis.md](https://github.com/Hyp02/hm-dianping/files/12577092/redis.md)# hm-dianping
->
 > 部署上线时运行路径是`/www/wwwroot/nginx-1.18.0/html/hmdp;`
 >
 > ![image-20230910172759789](../../AppData/Roaming/Typora/typora-user-images/image-20230910172759789.png)
@@ -7,6 +5,20 @@
 > 访问路径是：`http://116.204.87.237/index.html`
 
 ![image-20230910172729145](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230910172729145.png)
+
+> 注意：
+>
+> 在运行前，要运行测试类中运行`testAddHotShop`方法将热点店铺存储在缓存中
+>
+> 并且使用postMan请求http://localhost:8081/voucher/seckill接口，将优惠券信息添加到数据库和redis中
+>
+> 部署的话同样要先给服务器redis中写入必要的数据
+>
+> 给redis中创建stream队列
+>
+> ![image-20230923214120389](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230923214120389.png)
+
+
 
 # redis笔记
 
@@ -989,7 +1001,7 @@ public class MvcConfig implements WebMvcConfigurer {
 
 ### 实战
 
-**给查询商铺信息添加缓存**
+#### **给查询商铺信息添加缓存**
 
 添加缓存流程
 
@@ -1053,15 +1065,15 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
 ![image-20230909154441208](C:\Users\Han\AppData\Roaming\Typora\typora-user-images\image-20230909154441208.png)
 
-**给首页店铺列表添加缓存**
+#### 给首页店铺列表添加缓存
 
-1.查询redis
+1.查询`redis`
 
-![image-20230909173015813](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230909173015813.png)
+![image-20230912200705180](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230912200705180.png)
 
 2.命中返回
 
-![image-20230909173027034](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230909173027034.png)
+![image-20230912200719458](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230912200719458.png)
 
 3.未命中，查询数据库
 
@@ -1111,13 +1123,13 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
 **为了解决数据库中数据与缓存数据不一致的问题**
 
-![image-20230909225821338](assets/image-20230909225821338.png)
+![image-20230909225821338](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230909225821338.png)
 
 缓存更新策略的选择
 
 ****
 
-![image-20230909231042187](assets/image-20230909231042187.png)
+![image-20230909231042187](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230909231042187.png)
 
 先操作缓存还是先操作数据库？这里有一个线程安全问题，
 
@@ -1146,7 +1158,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
 ![image-20230910134630562](../../AppData/Roaming/Typora/typora-user-images/image-20230910134630562.png)
 
-**解决店铺信息更新后缓存数据一致性问题**
+#### **解决店铺信息更新后缓存数据一致性问题**
 
 > 修改数据库中店铺信息后，因为缓存的原因，用户界面看到的数据还是旧数据，这时就要更新缓存
 
@@ -1189,7 +1201,7 @@ public Result updateShopById(Shop shop) {
     - 可能造成短期的不一致
     - 这两个问题都是可以解决的，可以设置返回空缓存，将空数据写到缓存中，并且设置TTL。
 
-![image-20230910135738536](../../AppData/Roaming/Typora/typora-user-images/image-20230910135738536.png)
+![image-20230910135738536](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230910135738536.png)
 
 - 布隆过滤
   - 优点：内存占用较少，没有多余key
@@ -1259,7 +1271,7 @@ public Result updateShopById(Shop shop) {
 
 ### **基于互斥锁方式解决缓存击穿问题**
 
-需求：修改根据Id查询商铺的业务，基于互斥锁方式来解决缓存击穿问题
+#### 修改根据Id查询商铺的业务，基于互斥锁方式来解决缓存击穿问题
 
 ![image-20230911102028082](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230911102028082.png)
 
@@ -1325,7 +1337,7 @@ public Result updateShopById(Shop shop) {
 
 ![image-20230911104134532](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230911104134532.png)
 
-> 这里学到一个编程技巧,如果在开发过程猴子那个,要向给某个pojo类增加一个字段,肯定要修改业务代码.非常不好
+> 这里学到一个编程技巧,如果在开发过程中,要向给某个pojo类增加一个字段,肯定要修改业务代码.非常不好
 >
 > 可以定义一个新的类pojo类,在这个类中添加你要增加的字段,并设置一个Object类型的Data字段。
 >
@@ -1351,7 +1363,7 @@ public Result updateShopById(Shop shop) {
 
             1. 返回缓存中的数据
 
-               ![image-20230911152841922](../../AppData/Roaming/Typora/typora-user-images/image-20230911152841922.png)
+               ![image-20230911152841922](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230911152841922.png)
 
          2. 过期
 
@@ -1406,7 +1418,693 @@ public Result updateShopById(Shop shop) {
 
 ## 缓存工具封装
 
+使用函数式编程+泛型方法进行封装
+
+- 创建`CacheClient`类，给这个类中注入操作Redis的对象`StringRedisTemplate`
+- String类型set方法
+  - 传入一个key 一个任意类型的值，过期时间 过期时间的单位
+    ![image-20230912194632233](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230912194632233.png)
+
+- 为解决缓存击穿所设置的逻辑过期方法，设置逻辑过期时间
+
+![image-20230912194743194](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230912194743194.png)
+
+- 写入空缓存解决缓存穿透
+  - 使用函数式编程+泛型方法
+
+![image-20230912194812948](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230912194812948.png)
+
+- 逻辑过期解决缓存击穿
+
+![image-20230912194954938](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230912194954938.png)
+
+- 互斥锁解决缓存击穿
+
+![image-20230912195201760](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230912195201760.png)
+
+在Service层中调用对应方法
+
+> `this::getById` 是 Java 8 新增的一种方法引用（Method Reference）的语法。它是一种简化代码的方式，可用于将已有的方法作为参数传递给其他方法或Lambda表达式。
+>
+> 其中`getById`需要有参数传入，但是在工具类中已经定义了到底传入的是哪个参数，而且参数在方法参数列表中拥有,他只是告诉工具类我用的哪个方法而已
+
+![image-20230912200059105](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230912200059105.png)
+
+## 优惠券秒杀	
+
+![image-20230915082456799](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230915082456799.png)
+
+![image-20230915082440878](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230915082440878.png)
+
+### 全局唯一Id
+
+![image-20230912210859668](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230912210859668.png)
+
+**全局id生成器**
+
+ 根据时间戳和生成的序列拼接生成
+
+- 获取一个开始时间
+  ![image-20230914231728237](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230914231728237.png)
+- 获取当前时间戳，并获取与开始时间的差值
+- 生成序列
+  - 获取当前日期精确到天
+
+- 返回id 因为为64位，高32位为时间戳，低32位为当前订单的序列号
+
+```java
+/**
+     * 获取订单id
+     * @param keyPrefix
+     * @return
+     */
+    public long nextId(String keyPrefix) {
+        // 获取时间戳
+        LocalDateTime now = LocalDateTime.now();
+        long nowSecond = now.toEpochSecond(ZoneOffset.UTC);
+        long time = nowSecond - BEGIN_TIME;
+        // 生成序列号
+        // 获取当前日期，精确到天
+        String date = now.format(DateTimeFormatter.ofPattern("yyyy:MM:dd"));
+        long count = stringRedisTemplate.opsForValue().increment("icr:" + keyPrefix + date);
+        // 将时间戳左移32位，将生成的count拼接
+        return time << 32 | count;
+    }
+
+```
+
+## 实现优惠券秒杀下单
+
+有两种不同类型的优惠券
+
+![image-20230915082641836](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230915082641836.png)
+
+- 先添加一个优惠券
+  - 因没有后台管理系统，使用postMan发送json数据到对应接口来保存数据
+
+```json
+请求路径：`http://localhost:8081/voucher/seckill` post 
+{
+    "shopId": 1,
+    "title": "100元代金券",
+    "subTitle": "周一到周五",
+    "rules": "全场通用",
+    "payValue": 8000,
+    "actualValue": 10000,
+    "type": 1,
+    "stock": 100,
+    "beginTime": "2023-09-11T10:00:00",
+    "endTime": "2023-09-25T10:00:00"
+ }
+```
+
+- 点击抢购按钮后发送请求到对应接口
+
+![image-20230915090925117](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230915090925117.png)
+
+**优惠券下单**
+
+![image-20230915092408786](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230915092408786.png)
+
+**代码实现**
+
+- 在controller层中调用下单方法
+- 在service层中实现下单方法
+
+```java
+/**
+     * 优惠券下单
+     * @param voucherId
+     * @return
+     */
+    @Override
+    @Transactional
+    public Result buySeckillVoucher(Long voucherId) {
+        // 校验优惠券状态
+        SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
+        // 校验有效期
+        if (voucher.getBeginTime().isAfter(LocalDateTime.now())){
+            return Result.fail("活动未开始时间");
+        }
+        if (voucher.getEndTime().isBefore(LocalDateTime.now())) {
+            return Result.fail("活动已结束");
+        }
+        // 校验库存
+        Integer voucherStock = voucher.getStock();
+        if (voucherStock<1){
+            return Result.fail("库存不足");
+        }
+        // 扣减库存
+        boolean update = seckillVoucherService.update()
+                .setSql("stock=stock-1")
+                .eq("voucher_id", voucherId).update();
+        if (!update){
+            return Result.fail("库存不足");
+        }
+        // 生成订单id
+        long orderId = redisIdWorker.nextId("order");
+        // 创建订单
+        VoucherOrder voucherOrder = new VoucherOrder();
+        voucherOrder.setId(orderId);
+        voucherOrder.setUserId(UserHolder.getUser().getId());
+        voucherOrder.setVoucherId(voucherId);
+        // 保存订单
+        this.save(voucherOrder);
+        // 返回订单id
+        return Result.ok(orderId);
+    }
+```
 
 
 
+## 超卖问题
+
+![image-20230915155738723](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230915155738723.png)
+
+**超卖问题的方式**
+
+1. 在高并发场景下，当第一个线程查询数据库，发现优惠券库存刚好为1
+2. 数据库更改库存减一
+3. 就在1 2 执行的空隙时间内，刚好出现了第二个线程
+4. 查数据库库存，发现还未修改 还是1 又去数据库减库存，
+5. 因为2已经将数据库库存减为0了 又去减这时候就出现数据库数据为负数的情况
+
+![image-20230915112119759](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230915112119759.png)
+
+**解决超卖问题，使用乐观锁**
+
+**乐观锁：不加锁，在更新时判断是否有其他线程在修改** 
+
+- 版本号法
+  - 给优惠券表中添加一个版本号字段`version`
+  - 每一个线程都要查询当前优惠券库存和version
+  - 在减库存时，修改version的值，并且修改条件是id和version`set stock = stock -1 where id = 1 and version = 1` 
+  - 这样如果id和version有一个条件不满足就不会修改库存
+
+![image-20230915113922712](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230915113922712.png)
+
+- CAS(比较和修改)
+  - 查询库存
+  - 修改库存时SQL语句加上where条件为stock是否是第一步查出来的库存值`set stock = stock -1 where id = id and stack = 查出来的`
+  - 如果条件满足就会修改，如果不满足就不会修改库存
+
+![image-20230915114559389](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230915114559389.png)
+
+- 优化乐观锁
+  - 上面的方法是比较库存是否是首次查出来的值，这样有一个问题，如果有100个线程同时操作，第一个成功后，其他线程就会全部失败`set stock = stock -1 where id = id and stack = 查出来的` 
+  - 将修改条件该为查看库存是否大于0 只要库存还大于0 就可以操作`set stock = stock -1 where id = id and stack > 0`
+
+![image-20230915155321928](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230915155321928.png)
+
+## 一人一单
+
+![image-20230915172900484](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230915172900484.png)
+
+**实现一人一单**
+
+- 查询数据库订单表的订单是否有用户已经购买
+- 如果有返回错误信息
+- 没有，去执行扣减库存生成订单的方法
+- 这里会出现线程安全问题
+  - 会出现一个人多次购买
+  - 加锁
+  - 根据用户id加锁，同一个用户id加锁
+
+![image-20230915173349006](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230915173349006.png)
+
+```java
+ /**
+     * 优惠券订单
+     * @param voucherId
+     * @return
+     */
+    @Transactional
+    public Result createOrder(Long voucherId) {
+        // 一人一单
+        Long userId = UserHolder.getUser().getId();
+        // 对同一个id的用户加锁
+        // 使用intern返回字符串常量池中已经存在的对象的值，不会返回新对象
+        synchronized (userId.toString().intern()) {
+
+            Integer count = query().eq("user_id", userId)
+                    .eq("voucher_id", voucherId)
+                    .count();
+            if (count > 0) {
+                return Result.fail("您已经购买过了");
+            }
+            // 扣减库存
+            boolean update = seckillVoucherService.update()
+                    .setSql("stock=stock-1")
+                    .eq("voucher_id", voucherId)
+                    // where voucher_id = xx and stock = xx【乐观锁】
+                    //.eq("stock", voucherStock)
+                    // where voucher_id = xx and stock > 0 优化乐观锁，只要库存大于0就可以减库存  然后加锁限制同一用户购买】
+                    .gt("stock", 0).update();
+            if (!update) {
+                return Result.fail("库存不足");
+            }
+            // 生成订单id
+            long orderId = redisIdWorker.nextId("order");
+            // 创建订单
+            VoucherOrder voucherOrder = new VoucherOrder();
+            voucherOrder.setId(orderId);
+            voucherOrder.setUserId(UserHolder.getUser().getId());
+            voucherOrder.setVoucherId(voucherId);
+            // 保存订单
+            this.save(voucherOrder);
+            // 返回订单id
+            return Result.ok(orderId);
+        }
+    }
+```
+
+> 防止spring事务失效
+>
+> `如果一个方法在同一个类中直接被另一个方法调用而不经过代理，那么事务将不会生效。这是因为 Spring 的事务代理是基于动态代理或者 CGLIB 字节码增强的方式实现的，只有通过代理对象调用方法时，代理对象才能截获方法的调用并应用事务切面`。
+>
+> 解决方法：
+>
+> 获取当前对象的代理对象
+>
+> 通过代理对象调用相关方法，
+>
+> `在 Spring 中，可以使用 `AopContext.currentProxy()` 方法来获取当前代理对象，从而绕过事务切面的限制。该方法返回当前线程下的代理对象，使您能够在同一个类中的方法之间调用以触发事务切面。`
+>
+> 这样做需要在启动类中暴露代理对象并添加代理模式相关依赖
+>
+> ![image-20230915173739981](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230915173739981.png)
+>
+> ```xml
+> <!--动态代理模式-->
+> <dependency>
+>     <groupId>org.aspectj</groupId>
+>     <artifactId>aspectjweaver</artifactId>
+> </dependency>
+> ```
+
+这种加锁方式有一定问题，因为这种加锁方式是在同一台tomcat服务器中的，如果是分布式系统，拥有多台tomcat同一用户也会出现买多单的情况，所以就需要使用 **分布式锁**来处理
+
+## 分布式锁
+
+![image-20230915211227576](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230915211227576.png)
+
+**分布式锁：**满足分布式系统或集群模式下多进程可见并且互斥的锁
+
+![image-20230915211403579](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230915211403579.png)
+
+![image-20230915212557443](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230915212557443.png)
+
+### 基于redis的分布式锁
+
+- 获取锁
+  - 互斥：确保只能有一个线程获取锁
+  - 非阻塞：尝试一次，成功返回true,失败返回false
+
+```sql
+-- 添加锁，nx是互斥，ex是设置超时时间
+set lock thread1 nx ex 10
+```
+
+- 释放锁
+  -  手动释放
+  - 超时释放
+
+```sql
+-- 释放锁，删除即可
+DEL key
+```
+
+![image-20230918102355574](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230918102355574.png)
+
+**获取和释放锁逻辑**
+
+```java
+/**
+ * @author Han
+ * @data 2023/9/18
+ * @apiNode
+ */
+public class SimpleRedisLock implements ILock {
+
+    private static final String KEY_PREFIX = "lock:";
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+    private String name;
+
+    /**
+     * @param stringRedisTemplate 操作redis对象
+     * @param key                 要获取锁的redis key
+     */
+    public SimpleRedisLock(StringRedisTemplate stringRedisTemplate, String key) {
+        this.stringRedisTemplate = stringRedisTemplate;
+        this.name = key;
+    }
+
+    /**
+     * 尝试获取锁，使用redis实现分布锁
+     *
+     * @param expiredTime
+     * @return
+     */
+    @Override
+    public boolean tryLock(long expiredTime) {
+        // 获取线程id
+        long id = Thread.currentThread().getId();
+        // 加锁
+        Boolean isBool = stringRedisTemplate.opsForValue()
+                .setIfAbsent(KEY_PREFIX + name, id + "", expiredTime, TimeUnit.SECONDS);
+        return Boolean.TRUE.equals(isBool);
+    }
+
+    /**
+     * 释放锁
+     */
+    @Override
+    public void delLock() {
+        stringRedisTemplate.delete(KEY_PREFIX + name);
+    }
+}
+```
+
+**使用分布式锁**
+![image-20230918112547108](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230918112547108.png)
+
+> 这里有一个问题，我们设置了分布式锁的过期时间，如果遇到业务阻塞，时间过长，锁因为过期时间就会自动释放，这时候有另一线程获取了锁，执行业务的中途，这时第一个线程在退出阻塞转态，业务完成，释放了锁，就会导致第二个线程在执行逻辑时突然终端。。。也就是业务释放了不属于自己的锁 
+
+**优化**
+
+在释放锁时，判断是否是自己的锁，是自己的才去删
+
+使用`uuid+threadId`来作为`redis`分布式锁的值存入`redis`中，防止多个jvm产生相同的threadId。
+
+- 获取当前线程`id+uuid`的值
+- 获取redis中的存放值【是将id+uuid存放到redis中的】
+- 比较是否相同
+
+```java
+ /**
+     * 释放锁
+     * 优化，防止删除不属于自己的锁
+     */
+    @Override
+    public void delLock() {
+        // 获取uuid+线程id
+        String threadId = ID_PREFIX + Thread.currentThread().getId();
+        // 获取redis中的id
+        String id = stringRedisTemplate.opsForValue().get(KEY_PREFIX + name);
+        // 判断是否是自己的锁
+        // 比较当前线程id和redis中的值是否相同
+        if (threadId.equals(id)) {
+            stringRedisTemplate.delete(KEY_PREFIX + name);
+        }
+
+    }
+```
+
+> 这种方式还存在一个问题
+>
+> 就是在当前线程执行完业务后，就在**刚好要执行释放锁的逻辑时**，就在这时发生了阻塞，如果这个阻塞时间够长，触发了redis的超时释放。就会导致第二个线程获取到了锁，就在第二个线程执行业务中途时，第一个线程的阻塞完毕，去继续执行释放锁的逻辑，将线程二需要的锁释放了，这又会导致误删锁。**注意锁是根据key来删的**
+
+#### **使用lua脚本优化锁，防止误删不是自己线程的锁**
+
+- 本来会发生误删情况，上面已经说明发生误删的原因
+- 这里使用redis lua脚本来释放锁
+  1.  第一个线程进来 阻塞 锁超时释放
+  2.  第二个进来 因为线程一锁超时释放，拿到锁
+  3.  这时，第一个线程阻塞完毕，因为在2中 第二个线程进来将ARGV设置成了第二个线程的id
+  4.  这时候1线程阻塞完毕，进行删锁时，发现key对应的值不同，所以不会发生误删
+
+```lua
+--- 分布式锁需要的lua脚本
+-- 判断要删除的锁的值是否与当前线程的值相同
+if(redis.call('get',KEYS[1] ) == ARGV[1] ) then
+    -- 释放锁
+    return redis.call('del',KEYS[1])
+end
+return 0
+```
+
+```java
+/**
+ * 释放锁
+ * 优化，防止删除不属于自己的锁 使用lua脚本
+ * 1.第一个线程进来 阻塞 锁超时释放
+ * 2.第二个进来 因为锁超时释放拿到锁
+ * 3.这时，第一个线程阻塞完毕，因为在2中 第二个线程进来将ARGV设置成了第二个线程的id，
+ * 4 这时候1线程阻塞完毕，进行删锁时，发现key对应的值不同，所以不会发生误删
+ */
+@Override
+public void delLock() {
+    //
+    stringRedisTemplate.execute(UNLOCK_SCRIPT,
+            Collections.singletonList(KEY_PREFIX + name),
+            ID_PREFIX + Thread.currentThread().getId()
+    );
+}
+```
+
+> 这种方式避免了误删问题,但是还是存在超时释放,可能会导致其他问题
+
+### Redisson
+
+### 使用Redisson
+
+- 引入依赖
+
+```xml
+ <!--redisson依赖-->
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson</artifactId>
+            <version>3.13.6</version>
+        </dependency>
+```
+
+- 配置
+
+```java
+@Configuration
+public class RedisConfig {
+    @Bean
+    public RedissonClient redissonClient() {
+        Config config = new Config();
+        config.useSingleServer()
+                .setAddress("redis://192.168.48.139:6379")
+                .setPassword("123456");
+        return Redisson.create(config);
+    }
+}
+```
+
+- 使用
+
+![image-20230920173658123](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230920173658123.png)
+
+```java
+ @Resource
+    private RedissonClient redissonClient;
+
+// 使用redisson中的锁
+        RLock orderLock = redissonClient.getLock("lock:order:" + userId);
+        boolean tryLock = orderLock.tryLock();
+        if (!tryLock) {
+            return Result.fail("不能重复下单");
+        }
+        try {
+            // 创建订单
+            IVoucherOrderService voucherOrderService = (IVoucherOrderService) AopContext.currentProxy();
+            return voucherOrderService.createOrder(voucherId);
+        } finally {
+            //orderLock.delLock();
+            orderLock.unlock();
+
+        }
+```
+
+#### Redisson可重入锁
+
+可重入锁就是 A方法调用B方法，A方法中需要获取锁，B方法也要获取锁，在B方法执行完后不能将锁释放，要等到A方法也执行完之后才可以将锁释放。如果这个调用有多层嵌套，需要将最外层方法执行完毕后，才将锁释放，这种锁就叫做可重入锁
+
+![image-20230920151927974](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230920151927974.png)
+
+- 在获取锁时，先判断锁是否存在，存在的话判断是不是自己的
+- 其中value属性是，每判断一次锁是不是自己的，是自己的将value的值+1
+- 在后续的业务中，每次需要获取锁，都先判断是不是自己的
+- 在执行完业务后，每需要释放锁时，判断是不是自己的，是将value的值-1，但不是真的释放锁，只是重置锁的过期时间
+- 当value的值为0 时，才将锁真正的释放，
+
+**就是一个嵌套执行，无论是A方法还是A中调用的B方法，都要走完这个逻辑**
+
+**使用lua脚本获取锁**
+
+![image-20230920153515259](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230920153515259.png)
+
+**使用lua脚本释放锁**
+
+![image-20230920155104718](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230920155104718.png)
+
+### redisson分布式锁主从一致性问题
+
+- 有多台redis,他们的角色不同，有一台做为主节点，剩下的作为从节点。主节点处理所有redis的写操作，从节点来处理所有redis的读操作
+
+- 所以所有数据存在于主节点中，从节点中没有数据，所以就要做主从之间的数据同步。主节点不断的把自己的数据同步到从节点，因为同步时有延迟，所以才会有主从一致性问题
+
+- 有一个Java应用，给主节点中写入了数据， 就在主节点要给从节点进行数据同步时，就在这时，主节点redis出现了故障。
+
+- redis就会在从节点中重新设置一个主节点，但是因为数据还未同步完成，redis中没有数据，其他线程获取锁就会成功，所以会发生线程安全问题。
+
+**这就是主从一致性导致的线程安全问题**
+
+![image-20230920164423911](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230920164423911.png)
+
+## **Redis优化秒杀**
+
+![image-20230920174026838](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230920174026838.png)
+
+
+
+![image-20230920174735371](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230920174735371.png)
+
+**添加秒杀优惠券时，需要将秒杀优惠券信息存放到redis中**
+
+> 注意：在添加秒杀优惠券时，需要将优惠券库存信息存放到redis中
+>
+> ![image-20230920212929612](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230920212929612.png)
+
+- 编写lua脚本实现购买资格的判断
+- 执行lua脚本
+- 判断是否返回0
+  - 返回0，说明有购买资格
+  - 返回1，说明优惠券库存不足
+  - 返回2，说明这个用户已经购买过了
+- 如果有购买资格，将优惠券id，用户id，和订单id存入阻塞队列，
+  - 将数据异步存入数据库
+- 返回订单id
+
+**资格判断lua脚本**
+
+- 下单用户存放在set类型中，其中有多个用户
+- 下一次下单使用`sismember`类判断用户id是否存在于redis的set中【是否重复下单】
+
+```lua
+-- 优惠券id
+local voucherId = ARGV[1]
+-- 用户id
+local userId = ARGV[2]
+-- 库存key
+local stockKey = "seckill:stock:" .. voucherId
+-- 订单key
+local orderKey = "seckill:order:" .. voucherId
+-- 判断库存是否充足
+if (tonumber(redis.call("get", stockKey)) < 0) then
+    -- 库存不足
+    return 1
+end
+-- 判断用户是否下过单
+if (redis.call("sismember", orderKey, userId) == 1) then
+    -- 下过单
+    return 2
+end
+-- 扣减库存
+redis.call("incrby", stockKey, -1)
+-- 保存下单用户
+redis.call("sadd", orderKey, userId)
+-- 成功返回0
+return 0
+
+```
+
+## **Redis消息队列实现异步秒杀**
+
+**消息队列：**字面意思就是存放消息的队列，最简单的消息队列模型包括三个角色
+
+- 消息队列：存储和管理消息，也被称为消息代理（**Message Broker**）
+- 生产者: 发送消息到消息队列
+- 消费者：从消息队列获取消息并处理消息
+
+Redis提供了三种不同的方式来实现消息队列
+
+- List结构：基于List节骨模拟消息队列
+- PubSub：基本的点对点消息模型
+- Stream：比较完整的消息队列模型
+
+![image-20230923135748936](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230923135748936.png)
+
+#### 基于List结构模拟消息队列
+
+![image-20230923140248284](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230923140248284.png)
+
+![image-20230923140351621](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230923140351621.png)
+
+#### 基于PubSub的消息队列
+
+**PubSub（发布订阅）：**是Redis2.0版本引入的消息队列传递模型，顾名思义，消费者可以订阅一个或多个 Channel，生产者向对应channel发送消息后，所有订阅者都可以收到相关消息。
+
+![image-20230923141443789](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230923141443789.png)
+
+
+
+- 第一个是生产者，发送指定频道消息
+- 第二个订阅了order.q1的消息，只能接收来自order.q1频道的消息
+- 第三个订阅了order.*消息，可以接收来自order任何频道的消息
+
+![image-20230923144852957](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230923144852957.png)
+
+#### 基于Stream类型的消息队列
+
+![image-20230923151320598](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230923151320598.png)
+
+![image-20230923151408303](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230923151408303.png)
+
+![image-20230923151450368](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230923151450368.png)
+
+![image-20230923151655934](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230923151655934.png)
+
+![image-20230923151740858](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230923151740858.png)
+
+#### 基于Stream的消息队列——消费者组
+
+**消费者组：**将多个消费者划分到一个组中，监听同一个队列，具备以下特点
+
+![image-20230923152516752](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230923152516752.png)
+
+创建消费者组
+
+![image-20230923152807133](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230923152807133.png)
+
+![image-20230923154127909](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230923154127909.png)
+
+![image-20230923160539431](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230923160539431.png)
+
+![image-20230923160558484](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230923160558484.png)
+
+### 基于redis的stream结构作为消息队列，实现异步秒杀下单
+
+- 创建一个stream类型的消息队列，名为stream.orders
+- 修改lua脚本，在认定有抢购资格后，直接向stream.orders中添加消息，内容包括voucherId，userId，orderId.
+- 项目启动时，开启一个新线程，用来获取stream.orders中的消息，实现异步下单
+
+> 代码逻辑
+>
+> - 进入接口的业务类
+>   - 在业务类中执行lua脚本
+>   - ![image-20230923183208414](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230923183208414.png)
+> - 直接创建订单,返回订单id给前端
+> - 真正创建订单操作数据库的逻辑交给异步处理
+>   - 异步`handleVoucherOrder`方法中，等待，当消息队列中有订单信息时处理，没有等待，死循环，一直等待
+>     - 取出消息队列中的信息
+>     - 判断是否获取成功，未成功再次继续获取
+>     - 解析订单中的信息
+>     - 创建真正订单
+>       - 调用真正操作数据库的方法`createOrder`，创建订单
+>   - 异步出现异常，如确认失败的消息，会存放到`pendingList`中，死循环，不断执行`handlePendinglist`方法
+>     - 取队列里以读取但未确认的消息
+>     - 如果获取失败说明所有订单处理完毕
+>
+> - 初始化代理对象
+> - 返回订单id
+
+![image-20230923182829396](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230923182829396.png)
+
+**至此，秒杀功能结束**
 
