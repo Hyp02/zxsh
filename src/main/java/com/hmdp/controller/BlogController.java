@@ -29,28 +29,52 @@ public class BlogController {
 
     @Resource
     private IBlogService blogService;
-    @Resource
-    private IUserService userService;
 
+
+    /**
+     * 发布探店笔记
+     * @param blog
+     * @return
+     */
     @PostMapping
     public Result saveBlog(@RequestBody Blog blog) {
         // 获取登录用户
         UserDTO user = UserHolder.getUser();
         blog.setUserId(user.getId());
         // 保存探店博文
-        blogService.save(blog);
+        Result result = blogService.saveBlog(blog);
         // 返回id
-        return Result.ok(blog.getId());
+        return result;
     }
 
+    /**
+     * 点赞探店笔记
+     * @param id
+     * @return
+     */
     @PutMapping("/like/{id}")
     public Result likeBlog(@PathVariable("id") Long id) {
         // 修改点赞数量
-        blogService.update()
-                .setSql("liked = liked + 1").eq("id", id).update();
+        blogService.likeBlog(id);
         return Result.ok();
     }
 
+    /**
+     * 显示点赞人头像
+     * @param id
+     * @return
+     */
+    @GetMapping("/likes/{id}")
+    public Result likesBlog(@PathVariable("id") Long id) {
+
+        return  blogService.queryBlogLikes(id);
+    }
+
+    /**
+     * 在我的页面显示你发布的博文
+     * @param current
+     * @return
+     */
     @GetMapping("/of/me")
     public Result queryMyBlog(@RequestParam(value = "current", defaultValue = "1") Integer current) {
         // 获取登录用户
@@ -63,21 +87,23 @@ public class BlogController {
         return Result.ok(records);
     }
 
+    /**
+     * 在主页显示所有笔记 每页最多十个
+     * @param current
+     * @return
+     */
     @GetMapping("/hot")
     public Result queryHotBlog(@RequestParam(value = "current", defaultValue = "1") Integer current) {
-        // 根据用户查询
-        Page<Blog> page = blogService.query()
-                .orderByDesc("liked")
-                .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
-        // 获取当前页数据
-        List<Blog> records = page.getRecords();
-        // 查询用户
-        records.forEach(blog ->{
-            Long userId = blog.getUserId();
-            com.hmdp.entity.User user = userService.getById(userId);
-            blog.setName(user.getNickName());
-            blog.setIcon(user.getIcon());
-        });
-        return Result.ok(records);
+        return blogService.queryHotBolg(current);
+    }
+
+    /**
+     * 根据博文id查看博文详情
+     * @param id
+     * @return
+     */
+    @GetMapping("/{id}")
+    private Result queryBolgById(@PathVariable("id") Long id){
+        return blogService.queryBolgById(id);
     }
 }
