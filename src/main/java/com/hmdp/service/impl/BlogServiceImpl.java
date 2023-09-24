@@ -35,6 +35,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         if (content == null) {
             return Result.fail("请填写评价");
         }
+        // 保存
         this.save(blog);
         return Result.ok(blog.getId());
     }
