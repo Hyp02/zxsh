@@ -1,10 +1,3 @@
-> 部署上线时运行路径是`/www/wwwroot/nginx-1.18.0/html/hmdp;`
->
-> ![image-20230910172759789](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230910172759789.png)
->
-> 访问路径是：`http://116.204.87.237/index.html`
-
-![image-20230910172729145](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230910172729145.png)
 
 > 注意：
 >
