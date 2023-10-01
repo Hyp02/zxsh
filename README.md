@@ -1,6 +1,6 @@
 > 部署上线时运行路径是`/www/wwwroot/nginx-1.18.0/html/hmdp;`
 >
-> ![image-20230910172759789](../../AppData/Roaming/Typora/typora-user-images/image-20230910172759789.png)
+> ![image-20230910172759789](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230910172759789.png)
 >
 > 访问路径是：`http://116.204.87.237/index.html`
 
@@ -122,7 +122,7 @@ Redis的key允许有多个单词形成层级结构，多个单词之间用`:`隔
 
 存放数据
 
-![image-20230904090801040](C:\Users\Han\AppData\Roaming\Typora\typora-user-images\image-20230904090801040.png)
+![image-20230904090801040](../../AppData/Roaming/Typora/typora-user-images/image-20230904090801040.png)
 
 使用可视化界面查看
 
@@ -309,7 +309,7 @@ public class JedisTest {
 
 ![image-20230904153447913](C:\Users\Han\AppData\Roaming\Typora\typora-user-images\image-20230904153447913.png)
 
-![image-20230904153609538](C:\Users\Han\AppData\Roaming\Typora\typora-user-images\image-20230904153609538.png)
+![image-20230904153609538](../../AppData/Roaming/Typora/typora-user-images/image-20230904153609538.png)
 
 ### 使用
 
@@ -506,11 +506,7 @@ class SpringRedisTemplateTest {
 
 ## 短信验证码登录
 
-**使用黑马点评作为测试项目**
-
-将黑马点评的后端源码导入到IDEA中，启动
-
-将提供的前端代码复制到一个没有中文路径的文件中
+将前端代码复制到一个没有中文路径的文件中
 
 在nginx.exe所在的窗口输入`start nginx.exe`
 
@@ -1986,6 +1982,17 @@ public class RedisConfig {
 - 下单用户存放在set类型中，其中有多个用户
 - 下一次下单使用`sismember`类判断用户id是否存在于redis的set中【是否重复下单】
 
+```java
+// 执行lua脚本 资格确认，给消息队列中发送订单消息，创建订单信息到redis
+        Long result = stringRedisTemplate.execute(
+                SECKILL_SCRIPT,
+                Collections.emptyList(),
+                voucherId.toString(),
+                userId.toString(),
+                String.valueOf(orderId)
+        );
+```
+
 ```lua
 -- 优惠券id
 local voucherId = ARGV[1]
@@ -1993,7 +2000,7 @@ local voucherId = ARGV[1]
 local userId = ARGV[2]
 -- 库存key
 local stockKey = "seckill:stock:" .. voucherId
--- 订单key
+-- 订单key,其中保存下单用户id
 local orderKey = "seckill:order:" .. voucherId
 -- 判断库存是否充足
 if (tonumber(redis.call("get", stockKey)) < 0) then
@@ -2108,3 +2115,389 @@ Redis提供了三种不同的方式来实现消息队列
 
 **至此，秒杀功能结束**
 
+# redis实战[2]
+
+## 探店功能
+
+![image-20230924140620245](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230924140620245.png)
+
+**Blog类中包含了发布信息用户的id，可根据用户id查出来用户的头像姓名等信息，用来定位博主**
+
+### 查看探店笔记
+
+![image-20230924151952522](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230924151952522.png)
+
+### 点赞
+
+#### 点赞与取消点赞
+
+将当前登录用户获取，判断这个用户是否点赞过【使用redis的set类型存储点赞用户的用户id】，如果没有点赞过，进行点赞时，数据库点赞数量+1 并将当前用户的id存放到redis中，如果之前点赞过，再次点赞就是取消点赞，将数据点赞数量-1，并将redis中点赞用户id移除。并且在加载所有笔记和笔记详情中添加是否点赞的详情
+
+- 获取当前登录用户Id
+- 判断这个用户id是否存在于redis中
+  - 存在
+    - 说明已经点赞过，再点就是取消
+  - 不存在
+    - 数据库数据+1 存储用户id到redis中
+- 查询所有笔记和查看笔记详情中应当显示出来当前用户是否已经将这个博文点赞
+
+![image-20230924165347490](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230924165347490.png)
+
+![image-20230924165604628](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230924165604628.png)
+
+#### 点赞排行【使用sortedSet类型存放数据】
+
+根据点赞时间进行排序，使用SortedSet类型进行存储，其中可以存储一个source值，将这个值设置为点赞时的时间戳
+
+- 判断是否点赞不能使用set类型的isMember来确定，而是使用新类型的source的值是否为null，如果为null说明还没有点赞过【对应的redis数据是否有source值】
+- 使用`opsForZSet().score(key, userId.toString())`来确定其中有没有source值，如果有说明已经点赞过了
+- 修改上面的代码。将set类型修改为`sortedSet`类型，并在添加已经点赞人的时候将时间戳作为source存放到redis
+
+![image-20230924215754678](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230924215754678.png)
+
+#### 显示点赞人头像（top5）
+
+- 使用sortedSet类型中的range获取某个source段中的用户id
+- 将这些id转换为Long类型的List集合
+- 用id集合取出用户集合
+- 将用户集合转换为数据安全的UserDTO
+- 将UserDTO返回
+
+```java
+/**
+ * 显示点赞的用户top5
+ * @param id
+ * @return
+ */
+@Override
+public Result queryBlogLikes(Long id) {
+    // 获取前五名，使用range获取某个段内的用户
+    Set<String> top5 = stringRedisTemplate.opsForZSet().range(RedisConstants.BLOG_LIKED_KEY + id, 0, 5);
+    if (top5 == null|| top5.isEmpty()) {
+        // 如果没有人点赞，返回一个空集合
+        return Result.ok(Collections.emptyList());
+    }
+    // 将前五名的用户id使用stream流转换为Long类型的list集合
+    List<Long> ids = top5.stream()
+            .map(Long::valueOf)
+            .collect(Collectors.toList());
+    // 将list集合中的id使用 , 拼接为字符串
+    String idsStr = StrUtil.join(",", ids);
+    // 将取出的用户转换为DTO
+    List<UserDTO> userDTOS = userService.query()
+            .in("id", ids).last("ORDER BY FIELD(id,"+idsStr+")").list()
+            .stream()
+            .map(user -> BeanUtil.copyProperties(user, UserDTO.class))
+            .collect(Collectors.toList());
+    return Result.ok(userDTOS);
+}
+```
+
+> 这用一个问题，就是显示的排名先后顺序是反的，这是因为在数据中查询时使用的是in，虽然传的是（5--1），但是数据库默认返回的是（1--5）
+>
+> 解决方法就是自定义sql语句
+>
+> ![image-20230924232245935](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230924232245935.png)
+
+## 关注用户
+
+![image-20230925151819493](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230925151819493.png)
+
+### 关注和取关
+
+**首先进入详情系统会判断当前登录用户是否已经关注了这个人**
+
+![image-20230925144500583](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230925144500583.png)
+
+**点击关注系统会发送请求**
+![image-20230925144547312](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230925144547312.png)
+
+#### 关注用户
+
+- 获取当前登录的用户id
+- 判断请求到底是关注还是取关【关注请求中的参数是true还是false】
+  - true关注，新增数据
+  - false取关，删除数据
+
+![image-20230925151933256](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230925151933256.png)
+
+![image-20230925151947557](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230925151947557.png)
+
+#### 判断当前用户是否已经关注
+
+- 获取当前登录用户id
+- 在数据库表follow中根据当前登录用户id和followUserId查询是否存在数据
+  - 存在，表明已经关注
+  - 不存在，表明没有关注
+
+![image-20230925151904860](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230925151904860.png)
+
+![image-20230925151918012](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230925151918012.png)
+
+### 共同关注
+
+**当前登录的用户关注了谁，和博主关注了谁求交集就是共同关注【使用redis中的set集合的交集】**
+
+![image-20230925224157307](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230925224157307.png)
+
+![image-20230925224223167](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230925224223167.png)
+
+### 推送关注人的消息
+
+**使用scoredSet类型实现，将时间戳作为source**
+
+#### Feedl流
+
+**实现方案**
+
+![image-20230925230259722](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230925230259722.png)
+
+**注意：推模式比费空间**
+
+![image-20230925230350488](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230925230350488.png)
+
+![image-20230925231240033](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230925231240033.png)
+
+![image-20230925231432830](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230925231432830.png)
+
+**因为sortedSet会根据source值进行数据的排序，存数据的时候将时间戳当做source存入，我们查询的时候可以记录每一页最后一个信息，也就是source值最小的那个，第二页时小于这个最小值就是第二页的起始，再从这个起始找够每一页的数量就行，`第一页的起始可以设置为无穷大`。**
+
+#### 实现
+
+**在发布博客时直接将信息推送给粉丝**
+
+- 获取当前登录用户id
+- 保存当前发布的blog
+- 查询当前发布者的粉丝
+- 将信息推送给作者的粉丝
+  - 获取每一个粉丝userId
+  - 保存给key为`feed:userId` ,value为博客id，source为时间戳 的sourceSet
+- 
+
+> 粉丝怎么获取? 
+>
+> 在follow表中，userId存放的是粉丝，follow_user_id存放的是我，我需要知道谁关注者我，根据我的id，查看分粉丝
+>
+> `select user_id from follow where follow_user_id = 我的id`
+
+![image-20230926172340346](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230926172340346.png)
+
+#### 滚动分页实现查看收件箱
+
+> 根据脚标查询的问题
+>
+> - 原始数据为543210
+>
+> 如果根据角标查询,
+>
+> - 每页3个数据 查第一页为`0-2` 显示`543`
+>
+> - 这时候突然插入了一条数据` 6`
+> - 查询第二页数据为`3-5` 理论显示的是`210`但是由于插入了一条数据 `角标发生的变化`
+> - 根据角标查第二页`3-5`查出来的数据为`321 `
+> - `3`这条数据重复了
+>
+> 所以根据角标进行分页这种方式不可取，故使用滚动分页的方式进行分页
+>
+> `ZREVRANGEBYSCORE key Max Min LIMIT offset count`
+
+![image-20230926181941386](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230926181941386.png)
+
+![image-20230926182002019](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230926182002019.png)
+
+![image-20230926182023142](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230926182023142.png)
+
+![image-20230926182130339](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230926182130339.png)
+
+- 获取当前用户
+- 查询当前用户的收件箱
+
+![image-20230926225651364](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230926225651364.png)
+
+- 实现滑动分页
+
+```java
+/**
+     * 查看关注人的博客
+     * @param max
+     * @param offset
+     * @return
+     */
+    @GetMapping("/of/follow")
+    public Result queryBlogOfFollow(@RequestParam("lastId") Long max ,
+                                    @RequestParam(value = "offset" ,defaultValue = "0") Integer offset){
+        return blogService.queryBlogOfFollow(max,offset);
+
+    }
+
+/**
+     * 查看关注人的博客
+     * 实现滚动分页
+     * @param max
+     * @param offset
+     * @return
+     */
+    @Override
+    public Result queryBlogOfFollow(Long max, Integer offset) {
+        // 获取当前用户
+        UserDTO user = UserHolder.getUser();
+        Long userId = user.getId();
+        // 获取当前用户的收件箱
+        String key = FEED_KEY + userId;
+        // 获取用户收件箱
+        Set<ZSetOperations.TypedTuple<String>> inBox = stringRedisTemplate.opsForZSet()
+                .reverseRangeByScoreWithScores(key, 0,max, offset,3);
+        if (inBox == null || inBox.isEmpty()) {
+            return Result.ok();
+        }
+        // 实现滚动分页
+        /**
+         * 循环将收件箱中的元素取出来
+         * 如何查找最小时间和最小时间 相同最小时间的个数有几个
+         * 初始化最小时间为0
+         * 将当前查出来的时间和最小时间作比较
+         * 如果最小时间和查出来的时间相同 将数量加一 【第一次最小时间是0 不可能会有】
+         * 如果不同，将查出来的时间当做最小的，进行下一次比较
+         * 当出现不同的，说明又查出了更小的时间，将更小的时间和数量赋值和初始化
+         * 这样就得到最小时间和最小时间对应的元素的个数
+         */
+        // 存放收件箱中博客id的集合
+        List<Long> ids = new ArrayList<>();
+        long minTime = 0; // 初始化最小时间
+        int offsetCount = 1; // 初始化相同source元素个数
+        for (ZSetOperations.TypedTuple<String> box : inBox) {
+            // 给id集合中添加元素
+            ids.add(Long.valueOf(box.getValue()));
+            // 获取source
+            long time = box.getScore().longValue();
+            if (time == minTime) {
+                // 如果当前时间就是最小时间。给offset+1
+                offsetCount++;
+            } else {
+                // 如果当前时间不是最小时间
+                // 将当前时间赋值给最小时间
+                minTime = time;
+                // 初始化offsetCount
+                offsetCount = 1;
+            }
+        }
+        // 根据博客id将博客id查出来
+        String idsStr = StrUtil.join(",", ids);
+        List<Blog> blogs = this.query()
+                .in("id", ids)
+                .last("ORDER BY FIELD(id," + idsStr + ")")
+                .list();
+        // 查看博客被点赞和关联的用户
+        for (Blog blog : blogs) {
+            // 查看发布博客的人【用来显示作者头像】
+            this.queryBlogUser(blog);
+            // 查看这个博客是否被你点赞
+            this.isBlogLiked(blog);
+        }
+        // 封装返回对象
+        ScrollResult scrollResult = new ScrollResult();
+        scrollResult.setList(blogs);
+        scrollResult.setMinTime(minTime);
+        scrollResult.setOffset(offsetCount);
+        return Result.ok(scrollResult);
+    }
+```
+
+> 注意：推送和获取关注者的博客在redis中key的设计需要特别注意
+>
+> 在保存博客的时候是以被关注的身份进行redis存储的
+>
+> 在查看时，是以关注者的身份查看的，
+>
+> 在存储时，是`feed:粉丝的id`
+>
+> 查看时：是`feed:自己的id`
+
+## 附近店铺
+
+### Geo数据结构
+
+![image-20230927145006156](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230927145006156.png)
+
+### 实现
+
+注意：我们将店铺信息存放在Geo中，存放的是店铺id和坐标，最终使用店铺id查询数据库，但是在前端请求中要使用到店铺类型id，但是Geo中没有存储类型id，怎么解决这个问题
+
+> 将不同类型的商户根据类型进行分组，最后将这个分组存放在不同的key下
+
+
+
+将店铺存放到Geo中，测试类代替后台管理，向redis中写入数
+
+但是这样做的效率很低，因为redis在写数据的时候，每写人一次店铺信息就要发一次请求给redis。所以这种方式效率低。
+
+![image-20230927215254619](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230927215254619.png)
+
+应该使用`RedisGeoCommands.GeoLocation<T>`将店铺信息存放到里面，最终封装成一个集合一次性写入redis中
+
+![image-20230927222251850](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230927222251850.png)
+
+运行后:
+
+![image-20230927222518743](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230927222518743.png)
+
+
+
+从存放的GEO中取出信息后，进行数据解析并实现根据距离排序
+
+- 先判断是否传入了经纬度信息，确保使用哪种方式进行排序
+- 计算分页参数，起始页和终止页
+- 从redis中取出之前存放的数据
+- 根据数据解析出店铺的信息
+- 将店铺的id和距离进行匹配存储
+- 根据id集合将所有店铺查出来
+- 给每一个店铺设置距离值
+- 返回店铺信息
+
+具体代码如下：
+
+![image-20230930151448164](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230930151448164.png)
+
+## 用户签到
+
+![image-20230930173412699](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230930173412699.png)
+
+![image-20230930173525321](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230930173525321.png)
+
+### BitMap
+
+![image-20230930173329351](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230930173329351.png)
+
+#### 实现
+
+![image-20230930180329030](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230930180329030.png)
+
+### 连续签到天数统计
+
+  ![image-20230930192025642](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230930192025642.png)
+
+使用postMan签到
+
+![image-20230930193245234](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230930193245234.png)
+
+查看连续签到天数
+
+![image-20230930193322829](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20230930193322829.png)
+
+# HyperLogLog
+
+首先我们先搞懂两个感念
+
+## UV
+
+![image-20231001133245636](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20231001133245636.png)
+
+## PV
+
+![image-20231001133252850](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20231001133252850.png)
+
+![image-20231001133302800](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20231001133302800.png)
+
+## 用法
+
+![image-20231001133807326](https://gitee.com/hyp02/typora_lmage/raw/master/img/image-20231001133807326.png)
