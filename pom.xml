@@ -41,6 +41,7 @@
             <artifactId>lettuce-core</artifactId>
             <version>6.1.6.RELEASE</version>
         </dependency>
+
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-pool2</artifactId>
