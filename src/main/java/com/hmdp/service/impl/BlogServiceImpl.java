@@ -118,16 +118,20 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
          * 如何查找最小时间和最小时间 相同最小时间的个数有几个
          * 初始化最小时间为0
          * 将当前查出来的时间和最小时间作比较
-         * 如果最小时间和查出来的时间相同 将数量加一 【第一次最小时间是0 不可能会有】
+         * 如果最小时间和查出来的时间相同 将数量加一 【第一次最小时间是0 不可能会相同】
          * 如果不同，将查出来的时间当做最小的，进行下一次比较
          * 当出现不同的，说明又查出了更小的时间，将更小的时间和数量赋值和初始化
          * 这样就得到最小时间和最小时间对应的元素的个数
          */
         // 存放收件箱中博客id的集合
-        List<Long> ids = new ArrayList<>();
+        List<Long> ids = new ArrayList<>(inBox.size());
         long minTime = 0; // 初始化最小时间
         int offsetCount = 1; // 初始化相同source元素个数
         for (ZSetOperations.TypedTuple<String> box : inBox) {
+            // 校验
+            if (box.getValue() == null || box.getScore() == null) {
+                return Result.ok();
+            }
             // 给id集合中添加元素
             ids.add(Long.valueOf(box.getValue()));
             // 获取source
