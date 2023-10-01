@@ -1,6 +1,7 @@
 package com.hmdp.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -12,15 +13,24 @@ import com.hmdp.mapper.UserMapper;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.RegexUtils;
+import com.hmdp.utils.UserHolder;
+import javafx.scene.input.DataFormat;
+import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpSession;
+import javax.swing.text.DateFormatter;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -62,7 +72,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // 发送验证码【因为发送验证码需要调用第三发Api,这里使用日志记录】
         log.debug("发送验证码成功 验证码为：{}", code);
         // 返回成功信息
-        return Result.ok();
+        return Result.ok("验证码为：" + code);
     }
 
     @Override
@@ -103,7 +113,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         userMap.put("id", String.valueOf(userDTO.getId()));
         userMap.put("nickName", userDTO.getNickName());
         userMap.put("icon", userDTO.getIcon());
-
         // 将脱敏用户保存 [记录登录用户]
         // session.setAttribute("user", userDTO);
         /**
@@ -125,7 +134,74 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // 设置有效期
         stringRedisTemplate.expire(RedisConstants.LOGIN_USER_KEY + token, LOGIN_USER_TTL, TimeUnit.MINUTES);
         // 返回token
+        log.info("token是 {} ", token);
         return Result.ok(token);
+    }
+
+    /**
+     * 用户签到
+     *
+     * @return
+     */
+    @Override
+    public Result sign() {
+        // 获取当前登录用户
+        Long id = UserHolder.getUser().getId();
+        // 获取当前日期
+        LocalDateTime now = LocalDateTime.now();
+        // 拼接key
+        String key = USER_SIGN_KEY + id + now.format(DateTimeFormatter.ofPattern(":yyyyMM"));
+        // 获取今天是一个月的第几天
+        int dayOfMonth = now.getDayOfMonth() - 1;
+        // 写入redis setBit key offset 1
+        stringRedisTemplate.opsForValue().setBit(key, dayOfMonth, true);
+        return Result.ok();
+    }
+
+    /**
+     * 统计连续签到天数
+     * @return
+     */
+    @Override
+    public Result signCount() {
+        // 获取当前登录用户
+        Long id = UserHolder.getUser().getId();
+        // 获取当前日期
+        LocalDateTime now = LocalDateTime.now();
+        // 拼接key
+        String key = USER_SIGN_KEY + id + now.format(DateTimeFormatter.ofPattern(":yyyyMM"));
+        // 获取今天是一个月的第几天
+        int dayOfMonth = now.getDayOfMonth() - 1;
+        // 获取当月的签到情况的十进制数 bitField key get u dayOfMonth 0
+        List<Long> list = stringRedisTemplate.opsForValue().bitField(
+                key,
+                BitFieldSubCommands.create()
+                        .get(BitFieldSubCommands.BitFieldType.unsigned(dayOfMonth))
+                        .valueAt(0)
+        );
+        if (list == null || list.isEmpty()) {
+            return Result.ok(0);
+        }
+        Long num = list.get(0);
+        if (num == null || num == 0) {
+            return Result.ok(0);
+        }
+        // 连续签到天数的计数器 初始化为1
+        int count = 0;
+        // 和1作与运算
+        while (true) {
+            // 判断运算结果
+            if ((num & 1) == 0) {
+                // 签到到这里中断了. 是0 结束
+                break;
+            } else {
+                count++;
+            }
+            // 是1 数字右移一位
+            num >>>= 1;
+        }
+
+        return Result.ok(count);
     }
 
     // 用户脱敏【未使用的方法】
